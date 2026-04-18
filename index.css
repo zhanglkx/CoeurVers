@@ -26,3 +26,9 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Mac / WebKit: 避免图标被当作可拖拽图片 */
+.shortcut-icon-hit {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}

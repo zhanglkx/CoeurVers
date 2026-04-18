@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { X, Image as ImageIcon, Layout, Upload, Download, Save, Settings, ExternalLink, Heart, ImageOff } from "lucide-react";
 import { AppSettings, Shortcut } from "../types";
 import { CURATED_WALLPAPER_ITEMS, CURATED_WALLPAPER_URLS } from "../services/background";
@@ -24,17 +24,49 @@ interface SettingsModalProps {
 
 type TabType = "general" | "background" | "layout" | "backup";
 
+/** 精选图库首次渲染数量；滚到底部再追加一批 */
+const WALLPAPER_GALLERY_PAGE = 15;
+
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, shortcuts, notes = [], onUpdateSettings, onImport }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const curatedGalleryRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabType>("general");
+  const [wallpaperGalleryCount, setWallpaperGalleryCount] = useState(WALLPAPER_GALLERY_PAGE);
 
   const effectiveGalleryList = useMemo(() => {
     const ordered = CURATED_WALLPAPER_URLS.filter((u) => settings.wallpaperFavoriteUrls.includes(u));
     return ordered.length > 0 ? ordered : [...CURATED_WALLPAPER_URLS];
   }, [settings.wallpaperFavoriteUrls]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    setWallpaperGalleryCount(WALLPAPER_GALLERY_PAGE);
+  }, [isOpen, activeTab]);
+
+  /** 可视区域过高、滚不动时自动多加载几批，直到可滚动或已全部加载 */
+  useLayoutEffect(() => {
+    if (!isOpen || activeTab !== "background" || HAS_UNSPLASH_API) return;
+    if (settings.backgroundMode !== "unsplash") return;
+    const el = curatedGalleryRef.current;
+    if (!el) return;
+    if (wallpaperGalleryCount >= CURATED_WALLPAPER_ITEMS.length) return;
+    if (el.scrollHeight > el.clientHeight + 4) return;
+    setWallpaperGalleryCount((c) => Math.min(c + WALLPAPER_GALLERY_PAGE, CURATED_WALLPAPER_ITEMS.length));
+  }, [isOpen, activeTab, wallpaperGalleryCount, settings.backgroundMode]);
+
   if (!isOpen) return null;
+
+  function handleCuratedWallpaperScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    const thresholdPx = 100;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight > thresholdPx) return;
+    setWallpaperGalleryCount((c) => {
+      const max = CURATED_WALLPAPER_ITEMS.length;
+      if (c >= max) return c;
+      return Math.min(c + WALLPAPER_GALLERY_PAGE, max);
+    });
+  }
 
   const toggleWallpaperFavorite = (url: string) => {
     const next = new Set(settings.wallpaperFavoriteUrls);
@@ -241,11 +273,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
       onClick={onClose}
     >
       <div
-        className="bg-[#1e1e1e]/90 backdrop-blur-2xl border border-white/10 w-full max-w-2xl h-[500px] rounded-3xl shadow-2xl flex overflow-hidden"
+        className="bg-[#1e1e1e]/90 backdrop-blur-2xl border border-white/10 w-[min(96vw,56rem)] max-w-5xl h-[min(88vh,840px)] max-h-[92vh] min-h-[520px] rounded-3xl shadow-2xl flex overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Sidebar */}
-        <div className="w-1/3 bg-white/5 border-r border-white/5 p-6 flex flex-col">
+        <div className="w-[min(13rem,32%)] shrink-0 bg-white/5 border-r border-white/5 p-6 flex flex-col">
           <h2 className="text-2xl font-bold text-white mb-8">Settings</h2>
           <div className="space-y-2">
             <button
@@ -284,7 +316,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-8 overflow-y-auto relative">
+        <div className="flex-1 min-w-0 p-8 sm:p-10 overflow-y-auto relative">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-semibold text-white">
               {activeTab === "general" && "General Settings"}
@@ -450,8 +482,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                         <p className="text-[11px] text-gray-500">
                           点击缩略图设为「固定当前」壁纸；点心形切换收藏。当前有效列表共 {effectiveGalleryList.length} 张。
                         </p>
-                        <div className="grid grid-cols-3 gap-2 max-h-[220px] overflow-y-auto pr-1">
-                          {CURATED_WALLPAPER_ITEMS.map((item) => {
+                        <p className="text-[11px] text-gray-500">
+                          图库共 {CURATED_WALLPAPER_ITEMS.length} 张，已展示{" "}
+                          {Math.min(wallpaperGalleryCount, CURATED_WALLPAPER_ITEMS.length)} 张
+                          {wallpaperGalleryCount < CURATED_WALLPAPER_ITEMS.length ? " — 在下方网格中滚到底部可加载更多" : " — 已全部展示"}
+                        </p>
+                        <div
+                          ref={curatedGalleryRef}
+                          className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-[min(52vh,520px)] min-h-[220px] overflow-y-auto pr-1 scroll-smooth overscroll-y-contain"
+                          onScroll={handleCuratedWallpaperScroll}
+                        >
+                          {CURATED_WALLPAPER_ITEMS.slice(0, wallpaperGalleryCount).map((item) => {
                             const isFav = settings.wallpaperFavoriteUrls.includes(item.url);
                             const listIdx = effectiveGalleryList.indexOf(item.url);
                             const isCurrentFixed =

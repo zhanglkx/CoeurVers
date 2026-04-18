@@ -11,6 +11,7 @@ import {
   filterToCuratedFavorites,
 } from "./services/background"
 import { getTablissStyleGreeting } from "./lib/greeting"
+import { getCachedWallpaperObjectUrl, putWallpaperBlob, fetchAndCacheWallpaper } from "./services/wallpaper-cache"
 
 const STORAGE_KEY = "aerotab_settings"
 const SHORTCUTS_KEY = "aerotab_shortcuts"
@@ -104,7 +105,8 @@ function App() {
   )
   const [slideIndex, setSlideIndex] = useState(0)
   const [displayBgUrl, setDisplayBgUrl] = useState(FALLBACK_BG)
-  const lastResolvedRef = useRef("")
+  const wallpaperLoadGenRef = useRef(0)
+  const wallpaperObjectUrlRef = useRef<string | null>(null)
 
   const effectiveCuratedUrls = useMemo(() => {
     const fav = settings.wallpaperFavoriteUrls
@@ -179,24 +181,73 @@ function App() {
     setSlideIndex(0)
   }, [HAS_UNSPLASH_API, settings.wallpaperFavoriteUrls.join("|"), settings.wallpaperPlayback, settings.backgroundMode])
 
-  useEffect(() => {
-    lastResolvedRef.current = ""
-  }, [settings.backgroundMode])
+  function revokeWallpaperBlobUrl() {
+    const u = wallpaperObjectUrlRef.current
+    if (u?.startsWith("blob:")) URL.revokeObjectURL(u)
+    wallpaperObjectUrlRef.current = null
+  }
 
   useEffect(() => {
-    const next = resolvedWallpaperUrl
-    if (!next || next === lastResolvedRef.current) return
+    return () => revokeWallpaperBlobUrl()
+  }, [])
 
-    const img = new Image()
-    img.onload = () => {
-      lastResolvedRef.current = next
-      setDisplayBgUrl(next)
+  useEffect(() => {
+    const sourceUrl = resolvedWallpaperUrl
+    if (!sourceUrl) return
+
+    if (sourceUrl.startsWith("data:")) {
+      revokeWallpaperBlobUrl()
+      setDisplayBgUrl(sourceUrl)
+      return
     }
-    img.onerror = () => {
-      lastResolvedRef.current = next
-      setDisplayBgUrl(next)
+
+    const loadId = ++wallpaperLoadGenRef.current
+    let cancelled = false
+
+    function applyDisplay(url: string, trackAsBlob: boolean) {
+      if (cancelled || loadId !== wallpaperLoadGenRef.current) return
+      if (trackAsBlob && url.startsWith("blob:")) {
+        revokeWallpaperBlobUrl()
+        wallpaperObjectUrlRef.current = url
+      }
+      setDisplayBgUrl(url)
     }
-    img.src = next
+
+    void (async () => {
+      const cachedObjUrl = await getCachedWallpaperObjectUrl(sourceUrl)
+      if (cancelled || loadId !== wallpaperLoadGenRef.current) {
+        if (cachedObjUrl) URL.revokeObjectURL(cachedObjUrl)
+        return
+      }
+
+      if (cachedObjUrl) applyDisplay(cachedObjUrl, true)
+
+      try {
+        const blob = await fetchAndCacheWallpaper(sourceUrl)
+        if (cancelled || loadId !== wallpaperLoadGenRef.current) return
+        void putWallpaperBlob(sourceUrl, blob)
+        const freshUrl = URL.createObjectURL(blob)
+        if (cancelled || loadId !== wallpaperLoadGenRef.current) {
+          URL.revokeObjectURL(freshUrl)
+          return
+        }
+        revokeWallpaperBlobUrl()
+        wallpaperObjectUrlRef.current = freshUrl
+        setDisplayBgUrl(freshUrl)
+      } catch {
+        if (cancelled || loadId !== wallpaperLoadGenRef.current) return
+        if (!wallpaperObjectUrlRef.current) {
+          const img = new Image()
+          img.onload = () => applyDisplay(sourceUrl, false)
+          img.onerror = () => applyDisplay(FALLBACK_BG, false)
+          img.src = sourceUrl
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
   }, [resolvedWallpaperUrl])
 
   useEffect(() => {
@@ -226,13 +277,9 @@ function App() {
       }
     }
 
-    const handleContextMenu = (e: MouseEvent) => e.preventDefault()
-
     document.addEventListener("keydown", handleKeyDown)
-    document.addEventListener("contextmenu", handleContextMenu)
     return () => {
       document.removeEventListener("keydown", handleKeyDown)
-      document.removeEventListener("contextmenu", handleContextMenu)
     }
   }, [])
 
@@ -261,7 +308,14 @@ function App() {
   }
 
   const editShortcut = (id: string, title: string, url: string) => {
-    setShortcuts((prev) => prev.map((s) => (s.id === id ? { ...s, title, url } : s)))
+    function mapDeep(items: Shortcut[]): Shortcut[] {
+      return items.map((s) => {
+        if (s.id === id) return { ...s, title, url }
+        if (s.children?.length) return { ...s, children: mapDeep(s.children) }
+        return s
+      })
+    }
+    setShortcuts((prev) => mapDeep(prev))
   }
 
   const handleReorder = (dragId: string, targetId: string) => {
