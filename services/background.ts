@@ -60,6 +60,13 @@ export function filterToCuratedFavorites(urls: string[]): string[] {
   return urls.filter((u) => typeof u === "string" && CURATED_URL_SET.has(u))
 }
 
+/** Favorites subset in curated order, or full gallery when none selected. */
+export function getEffectiveCuratedWallpaperUrls(favoriteUrls: string[]): string[] {
+  const ordered = CURATED_WALLPAPER_URLS.filter((u) => favoriteUrls.includes(u))
+  if (ordered.length > 0) return [...ordered]
+  return [...CURATED_WALLPAPER_URLS]
+}
+
 export interface BackgroundFetchResult {
   imageUrl: string
   creditLabel: string | null

@@ -1,16 +1,8 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { X, Image as ImageIcon, Layout, Upload, Download, Save, Settings, ExternalLink, Heart, ImageOff } from "lucide-react";
-import { AppSettings, Shortcut } from "../types";
-import { CURATED_WALLPAPER_ITEMS, CURATED_WALLPAPER_URLS } from "../services/background";
-
-const HAS_UNSPLASH_API = Boolean(String(import.meta.env.VITE_UNSPLASH_ACCESS_KEY ?? "").trim());
-
-interface Note {
-  id: string;
-  title: string;
-  content: string;
-  updatedAt: number;
-}
+import { AppSettings, Shortcut, Note } from "../types";
+import { hasUnsplashApi } from "../constants";
+import { CURATED_WALLPAPER_ITEMS, CURATED_WALLPAPER_URLS, getEffectiveCuratedWallpaperUrls } from "../services/background";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -34,10 +26,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   const [activeTab, setActiveTab] = useState<TabType>("general");
   const [wallpaperGalleryCount, setWallpaperGalleryCount] = useState(WALLPAPER_GALLERY_PAGE);
 
-  const effectiveGalleryList = useMemo(() => {
-    const ordered = CURATED_WALLPAPER_URLS.filter((u) => settings.wallpaperFavoriteUrls.includes(u));
-    return ordered.length > 0 ? ordered : [...CURATED_WALLPAPER_URLS];
-  }, [settings.wallpaperFavoriteUrls]);
+  const effectiveGalleryList = useMemo(
+    () => getEffectiveCuratedWallpaperUrls(settings.wallpaperFavoriteUrls),
+    [settings.wallpaperFavoriteUrls],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -46,7 +38,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
 
   /** 可视区域过高、滚不动时自动多加载几批，直到可滚动或已全部加载 */
   useLayoutEffect(() => {
-    if (!isOpen || activeTab !== "background" || HAS_UNSPLASH_API) return;
+    if (!isOpen || activeTab !== "background" || hasUnsplashApi) return;
     if (settings.backgroundMode !== "unsplash") return;
     const el = curatedGalleryRef.current;
     if (!el) return;
@@ -408,7 +400,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                   <div className="space-y-6 border-t border-white/10 pt-6">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">Wallpaper playback</label>
-                      {HAS_UNSPLASH_API ? (
+                      {hasUnsplashApi ? (
                         <p className="text-xs text-gray-500 leading-relaxed">
                           已配置 Unsplash API：壁纸由接口随机返回。下方「固定 / 轮播」控制单次加载还是按间隔重新请求新图（与精选图库无关）。
                         </p>
@@ -458,7 +450,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                       </div>
                     )}
 
-                    {!HAS_UNSPLASH_API && (
+                    {!hasUnsplashApi && (
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">精选图库</label>
@@ -532,7 +524,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                       </div>
                     )}
 
-                    {HAS_UNSPLASH_API && settings.wallpaperPlayback === "fixed" && (
+                    {hasUnsplashApi && settings.wallpaperPlayback === "fixed" && (
                       <p className="text-[11px] text-gray-500 flex items-start gap-2">
                         <ImageOff size={14} className="shrink-0 mt-0.5 opacity-60" />
                         固定模式：打开页面时请求一张随机图并保持；刷新页面可换新图。

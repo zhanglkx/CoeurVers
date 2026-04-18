@@ -1,3 +1,6 @@
+/** True when VITE_UNSPLASH_ACCESS_KEY is set (Tabliss-style random Unsplash). */
+export const hasUnsplashApi = Boolean(String(import.meta.env.VITE_UNSPLASH_ACCESS_KEY ?? "").trim())
+
 export const getFaviconUrl = (url: string): string => {
   try {
     const urlObj = new URL(url)
