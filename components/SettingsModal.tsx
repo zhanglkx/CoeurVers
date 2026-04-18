@@ -1,7 +1,9 @@
-import React, { useRef, useState } from "react";
-import { X, Image as ImageIcon, Layout, Upload, Download, Save, Settings, ExternalLink, Search } from "lucide-react";
+import React, { useMemo, useRef, useState } from "react";
+import { X, Image as ImageIcon, Layout, Upload, Download, Save, Settings, ExternalLink, Heart, ImageOff } from "lucide-react";
 import { AppSettings, Shortcut } from "../types";
-import { SUGGEST_SERVERS } from "../constants";
+import { CURATED_WALLPAPER_ITEMS, CURATED_WALLPAPER_URLS } from "../services/background";
+
+const HAS_UNSPLASH_API = Boolean(String(import.meta.env.VITE_UNSPLASH_ACCESS_KEY ?? "").trim());
 
 interface Note {
   id: string;
@@ -27,7 +29,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   const importInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<TabType>("general");
 
+  const effectiveGalleryList = useMemo(() => {
+    const ordered = CURATED_WALLPAPER_URLS.filter((u) => settings.wallpaperFavoriteUrls.includes(u));
+    return ordered.length > 0 ? ordered : [...CURATED_WALLPAPER_URLS];
+  }, [settings.wallpaperFavoriteUrls]);
+
   if (!isOpen) return null;
+
+  const toggleWallpaperFavorite = (url: string) => {
+    const next = new Set(settings.wallpaperFavoriteUrls);
+    if (next.has(url)) next.delete(url);
+    else next.add(url);
+    const ordered = CURATED_WALLPAPER_URLS.filter((u) => next.has(u));
+    onUpdateSettings({ wallpaperFavoriteUrls: ordered });
+  };
+
+  const setFixedWallpaperFromUrl = (url: string) => {
+    const idx = effectiveGalleryList.indexOf(url);
+    if (idx < 0) return;
+    onUpdateSettings({ wallpaperFixedIndex: idx, wallpaperPlayback: "fixed" });
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -73,18 +94,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   const validateSettings = (settings: any): settings is AppSettings => {
     if (!settings || typeof settings !== "object") return false;
 
-    // 检查必需的配置项
-    const requiredKeys = ["backgroundImage", "blurLevel", "gridConfig", "defaultEngine", "openInNewTab", "suggestServer", "customSuggestUrl"];
-    const hasAllKeys = requiredKeys.every((key) => key in settings);
-    if (!hasAllKeys) return false;
+    const legacyV1 =
+      "defaultEngine" in settings &&
+      "suggestServer" in settings &&
+      settings.backgroundImage !== undefined &&
+      settings.blurLevel !== undefined &&
+      settings.gridConfig &&
+      settings.openInNewTab !== undefined;
 
-    // 验证gridConfig结构
+    const v2 =
+      settings.blurLevel !== undefined &&
+      settings.gridConfig &&
+      settings.openInNewTab !== undefined &&
+      (settings.backgroundMode === "unsplash" || settings.backgroundMode === "upload" || settings.backgroundMode === undefined);
+
+    if (!legacyV1 && !v2) return false;
+
     if (!settings.gridConfig || typeof settings.gridConfig !== "object") return false;
     const gridKeys = ["rows", "cols", "iconSize", "gapX", "gapY"];
-    const hasAllGridKeys = gridKeys.every((key) => key in settings.gridConfig);
-    if (!hasAllGridKeys) return false;
+    if (!gridKeys.every((key) => key in settings.gridConfig)) return false;
 
-    // 验证数据类型
     return (
       (settings.backgroundImage === null || typeof settings.backgroundImage === "string") &&
       typeof settings.blurLevel === "number" &&
@@ -93,10 +122,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
       typeof settings.gridConfig.iconSize === "number" &&
       typeof settings.gridConfig.gapX === "number" &&
       typeof settings.gridConfig.gapY === "number" &&
-      typeof settings.defaultEngine === "string" &&
-      typeof settings.openInNewTab === "boolean" &&
-      typeof settings.suggestServer === "string" &&
-      (settings.customSuggestUrl === null || typeof settings.customSuggestUrl === "string")
+      typeof settings.openInNewTab === "boolean"
     );
   };
 
@@ -274,7 +300,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
           <div className="space-y-8">
             {activeTab === "general" && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                {/* Open in New Tab Toggle */}
                 <div className="space-y-3">
                   <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">Link Behavior</label>
                   <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
@@ -299,79 +324,181 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     </button>
                   </div>
                 </div>
-
-                {/* Search Suggestions Server */}
-                <div className="space-y-3">
-                  <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">Search Suggestions</label>
-                  <div className="space-y-4">
-                    {/* Server Selection */}
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
-                      <div className="flex items-center">
-                        <Search size={18} className="text-blue-400 mr-3" />
-                        <div>
-                          <span className="text-white font-medium block">Suggestion Server</span>
-                          <span className="text-xs text-gray-400">Choose which service to use for search suggestions</span>
-                        </div>
-                      </div>
-                      <div className="relative">
-                        <select
-                          value={settings.suggestServer}
-                          onChange={(e) => onUpdateSettings({ suggestServer: e.target.value as any })}
-                          className="appearance-none bg-white/10 border border-white/20 rounded-lg px-3 py-2 pr-8 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors cursor-pointer hover:bg-white/15"
-                        >
-                          {Object.values(SUGGEST_SERVERS).map((server) => (
-                            <option key={server.value} value={server.value} className="bg-gray-800">
-                              {server.name}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Custom URL Input */}
-                    {settings.suggestServer === "custom" && (
-                      <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                        <label className="text-white font-medium block mb-2">Custom Suggestion URL</label>
-                        <input
-                          type="text"
-                          value={settings.customSuggestUrl || ""}
-                          onChange={(e) => onUpdateSettings({ customSuggestUrl: e.target.value || null })}
-                          placeholder="https://example.com/suggest?q={query}"
-                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-colors text-sm"
-                        />
-                        <p className="text-xs text-gray-400 mt-2">
-                          Use {"{query}"} as placeholder for search query. Leave empty to disable suggestions.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             )}
             {activeTab === "background" && (
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                {/* Background Upload */}
                 <div className="space-y-3">
-                  <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">Custom Wallpaper</label>
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-white/10 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer hover:bg-white/5 hover:border-blue-500/50 transition-all group"
-                  >
-                    <Upload size={32} className="text-gray-500 group-hover:text-blue-400 mb-2 transition-colors" />
-                    <span className="text-sm text-gray-400 group-hover:text-gray-200">Click to upload image</span>
-                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
-                  </div>
-                  {settings.backgroundImage && (
-                    <button onClick={() => onUpdateSettings({ backgroundImage: null })} className="text-xs text-red-400 hover:text-red-300">
-                      Reset to default
+                  <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">Source</label>
+                  <p className="text-xs text-gray-500">Tabliss-style: Unsplash landscape photos (optional API key in <code className="text-gray-400">.env</code> as VITE_UNSPLASH_ACCESS_KEY).</p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => onUpdateSettings({ backgroundMode: "unsplash" })}
+                      className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors ${
+                        settings.backgroundMode === "unsplash" ? "bg-blue-600 text-white" : "bg-white/5 text-gray-300 hover:bg-white/10"
+                      }`}
+                    >
+                      Unsplash
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => onUpdateSettings({ backgroundMode: "upload" })}
+                      className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors ${
+                        settings.backgroundMode === "upload" ? "bg-blue-600 text-white" : "bg-white/5 text-gray-300 hover:bg-white/10"
+                      }`}
+                    >
+                      Custom upload
+                    </button>
+                  </div>
                 </div>
+
+                {settings.backgroundMode === "upload" && (
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">Custom Wallpaper</label>
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-white/10 rounded-2xl h-32 flex flex-col items-center justify-center cursor-pointer hover:bg-white/5 hover:border-blue-500/50 transition-all group"
+                    >
+                      <Upload size={32} className="text-gray-500 group-hover:text-blue-400 mb-2 transition-colors" />
+                      <span className="text-sm text-gray-400 group-hover:text-gray-200">Click to upload image</span>
+                      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                    </div>
+                    {settings.backgroundImage && (
+                      <button onClick={() => onUpdateSettings({ backgroundImage: null })} className="text-xs text-red-400 hover:text-red-300">
+                        Clear uploaded image
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {settings.backgroundMode === "unsplash" && (
+                  <div className="space-y-6 border-t border-white/10 pt-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">Wallpaper playback</label>
+                      {HAS_UNSPLASH_API ? (
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                          已配置 Unsplash API：壁纸由接口随机返回。下方「固定 / 轮播」控制单次加载还是按间隔重新请求新图（与精选图库无关）。
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                          未配置 API 时使用内置精选图库。可先点爱心加入收藏；未选任何收藏则使用全部壁纸。固定模式只显示当前一张；轮播按间隔在有效列表中切换。
+                        </p>
+                      )}
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => onUpdateSettings({ wallpaperPlayback: "fixed" })}
+                          className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors ${
+                            settings.wallpaperPlayback === "fixed" ? "bg-blue-600 text-white" : "bg-white/5 text-gray-300 hover:bg-white/10"
+                          }`}
+                        >
+                          固定当前
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onUpdateSettings({ wallpaperPlayback: "slideshow" })}
+                          className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors ${
+                            settings.wallpaperPlayback === "slideshow" ? "bg-blue-600 text-white" : "bg-white/5 text-gray-300 hover:bg-white/10"
+                          }`}
+                        >
+                          轮播
+                        </button>
+                      </div>
+                    </div>
+
+                    {settings.wallpaperPlayback === "slideshow" && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">切换间隔</label>
+                          <span className="text-sm text-blue-400">{settings.wallpaperSlideIntervalSec}s</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={15}
+                          max={300}
+                          step={15}
+                          value={settings.wallpaperSlideIntervalSec}
+                          onChange={(e) => onUpdateSettings({ wallpaperSlideIntervalSec: parseInt(e.target.value, 10) })}
+                          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        />
+                        <p className="text-[11px] text-gray-500">15–300 秒</p>
+                      </div>
+                    )}
+
+                    {!HAS_UNSPLASH_API && (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">精选图库</label>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onUpdateSettings({ wallpaperFavoriteUrls: [] })}
+                              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 text-gray-300 hover:bg-white/15 transition-colors"
+                            >
+                              使用全部
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onUpdateSettings({ wallpaperFavoriteUrls: [...CURATED_WALLPAPER_URLS] })}
+                              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 text-gray-300 hover:bg-white/15 transition-colors"
+                            >
+                              全选收藏
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-gray-500">
+                          点击缩略图设为「固定当前」壁纸；点心形切换收藏。当前有效列表共 {effectiveGalleryList.length} 张。
+                        </p>
+                        <div className="grid grid-cols-3 gap-2 max-h-[220px] overflow-y-auto pr-1">
+                          {CURATED_WALLPAPER_ITEMS.map((item) => {
+                            const isFav = settings.wallpaperFavoriteUrls.includes(item.url);
+                            const listIdx = effectiveGalleryList.indexOf(item.url);
+                            const isCurrentFixed =
+                              settings.wallpaperPlayback === "fixed" &&
+                              listIdx === settings.wallpaperFixedIndex % effectiveGalleryList.length;
+                            return (
+                              <div
+                                key={item.id}
+                                className={`relative group rounded-lg overflow-hidden border-2 transition-colors ${
+                                  isCurrentFixed ? "border-blue-400" : "border-transparent"
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => setFixedWallpaperFromUrl(item.url)}
+                                  className="block w-full aspect-video bg-cover bg-center relative"
+                                  style={{ backgroundImage: `url(${item.url})` }}
+                                  title="设为固定壁纸"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleWallpaperFavorite(item.url);
+                                  }}
+                                  className={`absolute top-1 right-1 p-1.5 rounded-md backdrop-blur-md transition-colors ${
+                                    isFav ? "bg-rose-500/90 text-white" : "bg-black/50 text-white/80 hover:bg-black/65"
+                                  }`}
+                                  title={isFav ? "取消收藏" : "加入收藏"}
+                                >
+                                  <Heart size={14} className={isFav ? "fill-current" : ""} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {HAS_UNSPLASH_API && settings.wallpaperPlayback === "fixed" && (
+                      <p className="text-[11px] text-gray-500 flex items-start gap-2">
+                        <ImageOff size={14} className="shrink-0 mt-0.5 opacity-60" />
+                        固定模式：打开页面时请求一张随机图并保持；刷新页面可换新图。
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Blur Slider */}
                 <div className="space-y-3">
@@ -518,7 +645,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     </div>
                     <div>
                       <span className="text-gray-400">Background:</span>
-                      <span className="text-white ml-2">{settings.backgroundImage ? "Custom" : "Default"}</span>
+                      <span className="text-white ml-2">
+                        {settings.backgroundMode === "upload" && settings.backgroundImage ? "Custom upload" : "Unsplash"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Wallpaper:</span>
+                      <span className="text-white ml-2">
+                        {settings.backgroundMode !== "unsplash"
+                          ? "—"
+                          : settings.wallpaperPlayback === "slideshow"
+                            ? `Slideshow ${settings.wallpaperSlideIntervalSec}s`
+                            : "Fixed"}
+                      </span>
                     </div>
                     <div>
                       <span className="text-gray-400">Blur Level:</span>
@@ -533,10 +672,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     <div>
                       <span className="text-gray-400">Icon Size:</span>
                       <span className="text-white ml-2">{settings.gridConfig.iconSize}px</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Search Engine:</span>
-                      <span className="text-white ml-2">{settings.defaultEngine}</span>
                     </div>
                   </div>
                 </div>

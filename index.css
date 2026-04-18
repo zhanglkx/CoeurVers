@@ -1,2 +1,28 @@
 @import "tailwindcss";
- 
+
+/* Tabliss web: system stack + bold digital time / semibold greeting */
+.tabliss-time-stack {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+}
+
+.tabliss-time-digital {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabliss-time-greeting {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.tabliss-zen-ease {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabliss-zen-ease {
+    transition-duration: 0.01ms !important;
+  }
+}
