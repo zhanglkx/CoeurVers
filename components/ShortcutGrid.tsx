@@ -183,7 +183,7 @@ const ShortcutIcon = ({ url, title, icon, size = 'default' }: { url: string, tit
     checkFavicon();
   }, [localIcon, url, faviconUrl]);
 
-  const iconSizeClass = size === 'default' ? 'w-[60%] h-[60%]' : 'w-full h-full'; // Inner icon relative size
+  const iconSizeClass = size === 'default' ? 'w-[80%] h-[80%]' : 'w-full h-full'; // Inner icon relative size
   const textSizeClass = size === 'default' ? 'text-2xl' : 'text-[10px] leading-none';
 
   // 显示加载状态
@@ -348,7 +348,7 @@ const ShortcutItem: React.FC<{
             }
           }
         }}
-        className={`flex flex-col items-center rounded-xl p-2 transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:scale-110 active:scale-95 group-hover:z-10
+        className={`flex flex-col items-center rounded-xl p-0 transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:scale-110 active:scale-95 group-hover:z-10
             ${isMergeTarget ? 'z-20 scale-125 bg-white/10 ring-4 ring-blue-500/30' : ''}
         `}
       >
