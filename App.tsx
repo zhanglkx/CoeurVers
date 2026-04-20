@@ -118,7 +118,7 @@ function App() {
         />
 
         <div
-          className={`w-full max-w-[90vw] flex justify-center tabliss-zen-ease will-change-[opacity,transform] transition-[opacity,transform] duration-500 ${
+          className={`w-full min-w-0 max-w-[90vw] self-stretch flex justify-center tabliss-zen-ease will-change-[opacity,transform] transition-[opacity,transform] duration-500 ${
             isZenFocus
               ? "pointer-events-none absolute inset-x-4 bottom-10 opacity-0 scale-[0.985] translate-y-3"
               : "relative mt-[20px] mb-[20px] min-h-0 flex-1 overflow-hidden opacity-100 scale-100 translate-y-0"

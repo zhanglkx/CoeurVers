@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, X, Pencil, Trash2, Check, Loader2, ChevronLeft } from 'lucide-react'
 import { Shortcut, GridConfig } from '../types'
@@ -126,6 +126,10 @@ interface ShortcutGridProps {
   onReorderRootFolders: (dragId: string, targetId: string) => void
   onMoveToRoot: (folderId: string, itemId: string) => void
 }
+
+type BookmarkGridCell =
+  | { kind: 'shortcut'; shortcut: Shortcut }
+  | { kind: 'add' }
 
 const ShortcutIcon = ({ url, title, icon, size = 'default' }: { url: string, title: string, icon?: string, size?: 'default' | 'small' }) => {
   // 优先使用定义的本地图标
@@ -284,7 +288,7 @@ const ShortcutItem: React.FC<{
 
   return (
     <div 
-        className={`relative group flex flex-col items-center transition-all duration-200 
+        className={`relative group flex shrink-0 flex-col items-center transition-all duration-200 
             ${isReorderTarget ? 'translate-x-2 opacity-80' : ''}
         `}
         style={{ width: `${size + 20}px` }} // slightly larger than icon for label space
@@ -514,8 +518,52 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
 
   // Defaults in case they are missing from config
   const iconSize = gridConfig.iconSize || 84;
-  const gapX = gridConfig.gapX !== undefined ? gridConfig.gapX : 24;
-  const gapY = gridConfig.gapY !== undefined ? gridConfig.gapY : 24;
+  /** Bookmark 面板：行距 24px、列距 16px（与主页网格配置独立） */
+  const bookmarkGapY = 24
+  const bookmarkGapX = 16
+  /** Matches ShortcutItem / add control width */
+  const cellWidthPx = iconSize + 20
+
+  const bookmarkGridMeasureRef = useRef<HTMLDivElement>(null)
+  const [bookmarkColumnsPerRow, setBookmarkColumnsPerRow] = useState(() => {
+    if (typeof window === 'undefined') return 1
+    const guess = Math.max(240, window.innerWidth * 0.62)
+    return Math.max(
+      1,
+      Math.floor((guess + bookmarkGapX) / (cellWidthPx + bookmarkGapX)),
+    )
+  })
+
+  useLayoutEffect(() => {
+    const el = bookmarkGridMeasureRef.current
+    if (!el) return
+    function columnsForWidth(w: number) {
+      if (w <= 0) return
+      const n = Math.max(1, Math.floor((w + bookmarkGapX) / (cellWidthPx + bookmarkGapX)))
+      setBookmarkColumnsPerRow((prev) => (prev === n ? prev : n))
+    }
+    function measureFromObserver(entries: ResizeObserverEntry[]) {
+      const entry = entries[0]
+      if (!entry) return
+      columnsForWidth(entry.contentRect.width)
+    }
+    {
+      const s = getComputedStyle(el)
+      const pl = parseFloat(s.paddingLeft) || 0
+      const pr = parseFloat(s.paddingRight) || 0
+      columnsForWidth(el.clientWidth - pl - pr)
+    }
+    const ro = new ResizeObserver(measureFromObserver)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [bookmarkGapX, cellWidthPx])
+
+  const bookmarkGridCells = useMemo((): BookmarkGridCell[] => {
+    return [
+      ...visibleItems.map((shortcut) => ({ kind: 'shortcut' as const, shortcut })),
+      { kind: 'add' as const },
+    ]
+  }, [visibleItems])
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -831,7 +879,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
 
   return (
     <>
-    <div className="z-10 mx-auto flex h-full min-h-0 max-h-full w-full max-w-[90vw] gap-4 px-0">
+    <div className="z-10 mx-auto flex h-full min-h-0 max-h-full w-full min-w-0 max-w-[90vw] gap-4 px-0">
       <aside
         className="scrollbar-hide flex h-full max-h-full min-h-0 w-32 shrink-0 flex-col gap-1 overflow-y-auto overflow-x-hidden rounded-2xl border border-white/10 bg-black/25 py-2 backdrop-blur-md"
         aria-label="书签分页"
@@ -928,29 +976,30 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
         </div>
 
         <div
-          className="scrollbar-hide min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0 [scrollbar-width:none]"
+          ref={bookmarkGridMeasureRef}
+          className="scrollbar-hide grid min-h-0 min-w-0 flex-1 justify-items-stretch overflow-x-hidden overflow-y-auto p-3 transition-all duration-300 sm:p-4 [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0 [scrollbar-width:none]"
+          style={{
+            gridTemplateColumns: `repeat(${bookmarkColumnsPerRow}, ${cellWidthPx}px)`,
+            columnGap: bookmarkGapX,
+            rowGap: bookmarkGapY,
+            justifyContent: 'center',
+          }}
           onDragOver={(e) => e.preventDefault()}
+          onDragLeave={() => {
+            setDragOverId(null)
+            setMergeTargetId(null)
+            if (mergeTimerRef.current) clearTimeout(mergeTimerRef.current)
+          }}
           onDrop={(e) => {
             handleBackdropDrop(e)
             setIsDragOverAddButton(false)
           }}
         >
-          <div
-            className="grid w-full min-w-0 justify-items-center transition-all duration-300"
-            style={{
-              gridTemplateColumns: `repeat(${gridConfig.cols}, minmax(0, 1fr))`,
-              gap: `${gapY}px ${gapX}px`,
-            }}
-            onDragLeave={() => {
-              setDragOverId(null)
-              setMergeTargetId(null)
-              if (mergeTimerRef.current) clearTimeout(mergeTimerRef.current)
-            }}
-          >
-            {visibleItems.map((shortcut) => (
+          {bookmarkGridCells.map((cell) =>
+            cell.kind === 'shortcut' ? (
               <ShortcutItem
-                key={shortcut.id}
-                shortcut={shortcut}
+                key={cell.shortcut.id}
+                shortcut={cell.shortcut}
                 onRemove={onRemoveShortcut}
                 onEdit={handleEditShortcutById}
                 onClickFolder={drillIntoFolder}
@@ -958,43 +1007,48 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
                 onItemDragOver={handleDragOver}
                 onItemDragLeave={handleDragLeave}
                 onItemDrop={handleDrop}
-                isMergeTarget={mergeTargetId === shortcut.id}
-                isReorderTarget={dragOverId === shortcut.id && mergeTargetId !== shortcut.id}
+                isMergeTarget={mergeTargetId === cell.shortcut.id}
+                isReorderTarget={
+                  dragOverId === cell.shortcut.id && mergeTargetId !== cell.shortcut.id
+                }
                 size={iconSize}
                 openInNewTab={openInNewTab}
               />
-            ))}
-
-            <div
-              className={`relative flex flex-col items-center transition-all duration-200 ${
-                isDragOverAddButton ? 'translate-x-2 opacity-80' : ''
-              }`}
-              style={{ width: `${iconSize + 20}px` }}
-              onDragOver={handleAddButtonDragOver}
-              onDragLeave={handleAddButtonDragLeave}
-              onDrop={handleAddButtonDrop}
-            >
-              {isDragOverAddButton ? (
-                <div className="absolute -left-3 top-1/2 z-0 h-12 w-1 -translate-y-1/2 animate-pulse rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
-              ) : null}
-
-              <button
-                type="button"
-                onClick={openAddModal}
-                className={`group flex flex-col items-center rounded-xl p-2 transition-all duration-300 hover:scale-110 hover:opacity-100 ${
-                  isDragOverAddButton ? 'scale-110 bg-white/10 ring-4 ring-blue-500/30' : 'opacity-50'
+            ) : (
+              <div
+                key="__bookmark-add__"
+                className={`relative flex min-w-0 shrink-0 flex-col items-center transition-all duration-200 ${
+                  isDragOverAddButton ? 'translate-x-2 opacity-80' : ''
                 }`}
-                draggable={false}
+                style={{ width: `${cellWidthPx}px` }}
+                onDragOver={handleAddButtonDragOver}
+                onDragLeave={handleAddButtonDragLeave}
+                onDrop={handleAddButtonDrop}
               >
-                <div
-                  className="flex items-center justify-center rounded-xl bg-transparent ring-1 ring-white/10 transition-colors hover:bg-white/10"
-                  style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
+                {isDragOverAddButton ? (
+                  <div className="absolute -left-3 top-1/2 z-0 h-12 w-1 -translate-y-1/2 animate-pulse rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={openAddModal}
+                  className={`group flex flex-col items-center rounded-xl p-2 transition-all duration-300 hover:scale-110 hover:opacity-100 ${
+                    isDragOverAddButton
+                      ? 'scale-110 bg-white/10 ring-4 ring-blue-500/30'
+                      : 'opacity-50'
+                  }`}
+                  draggable={false}
                 >
-                  <Plus size={iconSize * 0.35} className="text-white/60" />
-                </div>
-              </button>
-            </div>
-          </div>
+                  <div
+                    className="flex items-center justify-center rounded-xl bg-transparent ring-1 ring-white/10 transition-colors hover:bg-white/10"
+                    style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
+                  >
+                    <Plus size={iconSize * 0.35} className="text-white/60" />
+                  </div>
+                </button>
+              </div>
+            ),
+          )}
         </div>
       </div>
 

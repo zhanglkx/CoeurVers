@@ -591,46 +591,29 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                   </div>
                 </div>
 
-                {/* Columns / Rows */}
+                {/* Rows (cols reserved for import/export compat) */}
                 <div className="pt-4 border-t border-white/10">
                   <label className="text-sm font-medium text-gray-400 uppercase tracking-wider block mb-3">
-                    书签网格（每页列数）
+                    书签网格
                   </label>
                   <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
-                    主界面为左侧分页 + 中间可滚动区域；列数控制每行图标数量，内容超出时在同一页内纵向滚动。
+                    使用 CSS Grid：根据面板宽度自动计算每行列数，行与行之间为固定纵向间距；图标间距由上方「横向 / 纵向间距」控制；每行从左顶格排列，末行只占用实际格子数（不会出现整行居中留白）。
                   </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs text-gray-500 mb-1 block">列数</label>
-                      <input
-                        type="number"
-                        min="3"
-                        max="10"
-                        value={settings.gridConfig.cols}
-                        onChange={(e) =>
-                          onUpdateSettings({
-                            gridConfig: { ...settings.gridConfig, cols: parseInt(e.target.value) || 6 },
-                          })
-                        }
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 mb-1 block">行数（预留）</label>
-                      <p className="text-[10px] text-gray-600 mb-1.5 leading-snug">当前主界面不按行数截断，仅保留与导出配置兼容。</p>
-                      <input
-                        type="number"
-                        min="2"
-                        max="8"
-                        value={settings.gridConfig.rows}
-                        onChange={(e) =>
-                          onUpdateSettings({
-                            gridConfig: { ...settings.gridConfig, rows: parseInt(e.target.value) || 4 },
-                          })
-                        }
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                      />
-                    </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">行数（预留）</label>
+                    <p className="text-[10px] text-gray-600 mb-1.5 leading-snug">当前主界面不按行数截断，仅保留与导出配置兼容。</p>
+                    <input
+                      type="number"
+                      min="2"
+                      max="8"
+                      value={settings.gridConfig.rows}
+                      onChange={(e) =>
+                        onUpdateSettings({
+                          gridConfig: { ...settings.gridConfig, rows: parseInt(e.target.value) || 4 },
+                        })
+                      }
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 transition-colors max-w-xs"
+                    />
                   </div>
                 </div>
               </div>
@@ -675,7 +658,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     <div>
                       <span className="text-gray-400">书签网格:</span>
                       <span className="text-white ml-2">
-                        {settings.gridConfig.cols} 列（行数 {settings.gridConfig.rows} 为预留）
+                        自适应列数，间距 {settings.gridConfig.gapX}×{settings.gridConfig.gapY}px（行数{" "}
+                        {settings.gridConfig.rows} 预留）
                       </span>
                     </div>
                     <div>
