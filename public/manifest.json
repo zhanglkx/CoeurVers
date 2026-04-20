@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "CoeurVers",
+  "name": "CoeurVers - New Tab",
   "version": "1.0.0",
-  "description": "A beautiful custom new tab page with search functionality",
+  "description": "A beautiful, highly customizable new tab page with aesthetic wallpapers, smart shortcut grid, search suggestions, and zen clock.",
   "chrome_url_overrides": {
     "newtab": "index.html"
   },
-  "permissions": [],
+  "permissions": ["storage"],
   "host_permissions": [
     "https://suggestqueries.google.com/*",
     "https://api.bing.com/*",
