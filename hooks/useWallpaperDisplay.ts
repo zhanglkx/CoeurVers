@@ -8,7 +8,7 @@ import {
 } from "../services/background"
 import { getCachedWallpaperObjectUrl, putWallpaperBlob, fetchAndCacheWallpaper } from "../services/wallpaper-cache"
 
-export const FALLBACK_BG = "/bg.jpeg"
+export const FALLBACK_BG = "/_3qLnlJlyZw.jpeg"
 
 const SLIDESHOW_MIN_INTERVAL_SEC = 15
 

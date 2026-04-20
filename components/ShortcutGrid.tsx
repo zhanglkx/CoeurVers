@@ -1,5 +1,6 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, X, Pencil, Trash2 } from 'lucide-react';
 import { Shortcut, GridConfig } from '../types';
 import { getFaviconUrl, checkFaviconExists } from '../constants';
@@ -528,6 +529,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
   };
 
   return (
+    <>
     <div className="w-full max-w-[54rem] mx-auto px-0 z-10">
       <div
         className="grid w-full justify-items-center transition-all duration-300"
@@ -605,8 +607,8 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
         </div>
       </div>
 
-      {/* Add Modal */}
-      {isAdding && (
+      {/* Add Modal — portal avoids fixed positioning being clipped by ancestors with will-change/transform */}
+      {isAdding && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-[#1A1A1A] border border-white/10 p-6 rounded-3xl w-full max-w-sm shadow-2xl scale-100 animate-in zoom-in-95 duration-200 relative">
             <button 
@@ -656,11 +658,12 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Edit Modal */}
-      {isEditing && editingShortcut && (
+      {isEditing && editingShortcut && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-[#1A1A1A] border border-white/10 p-6 rounded-3xl w-full max-w-sm shadow-2xl scale-100 animate-in zoom-in-95 duration-200 relative">
             <button 
@@ -712,11 +715,12 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Folder Open Modal */}
-      {openFolder && (
+      {openFolder && createPortal(
           <div 
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-[10px] animate-in fade-in duration-200 p-4"
             onClick={() => setOpenFolder(null)}
@@ -825,9 +829,11 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
                    </div>
                  </div>
               </div>
-          </div>
+          </div>,
+          document.body
       )}
     </div>
+    </>
   );
 };
 
