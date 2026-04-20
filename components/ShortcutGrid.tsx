@@ -329,7 +329,7 @@ const ShortcutItem: React.FC<{
         {contextMenuOpen && (
           <div
             ref={contextMenuRef}
-            className="pointer-events-auto absolute -top-2 left-full z-50 ml-1.5 min-w-[160px] overflow-hidden rounded-2xl bg-neutral-900/85 p-1.5 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150"
+            className="pointer-events-auto absolute -top-2 left-full z-50 ml-1.5 min-w-[100px] overflow-hidden rounded-2xl bg-neutral-900/85 p-1.5 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150"
           >
             <button
               type="button"
