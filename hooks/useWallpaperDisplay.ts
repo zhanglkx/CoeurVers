@@ -10,6 +10,8 @@ import { getCachedWallpaperObjectUrl, putWallpaperBlob, fetchAndCacheWallpaper }
 
 export const FALLBACK_BG = "/bg.jpeg"
 
+const SLIDESHOW_MIN_INTERVAL_SEC = 15
+
 export function useWallpaperDisplay(settings: AppSettings) {
   const [unsplashBg, setUnsplashBg] = useState<BackgroundFetchResult | null>(null)
   const [slideIndex, setSlideIndex] = useState(0)
@@ -36,6 +38,11 @@ export function useWallpaperDisplay(settings: AppSettings) {
     return curatedWallpaperUrl
   }, [settings.backgroundMode, settings.backgroundImage, unsplashBg, curatedWallpaperUrl])
 
+  const slideshowIntervalMs = useMemo(
+    () => Math.max(SLIDESHOW_MIN_INTERVAL_SEC, settings.wallpaperSlideIntervalSec) * 1000,
+    [settings.wallpaperSlideIntervalSec],
+  )
+
   useEffect(() => {
     if (!hasUnsplashApi || settings.backgroundMode !== "unsplash") return
     let cancelled = false
@@ -51,23 +58,21 @@ export function useWallpaperDisplay(settings: AppSettings) {
   useEffect(() => {
     if (!hasUnsplashApi || settings.backgroundMode !== "unsplash") return
     if (settings.wallpaperPlayback !== "slideshow") return
-    const sec = Math.max(15, settings.wallpaperSlideIntervalSec)
     const id = window.setInterval(() => {
       void fetchTablissStyleBackground().then(setUnsplashBg)
-    }, sec * 1000)
+    }, slideshowIntervalMs)
     return () => window.clearInterval(id)
-  }, [settings.backgroundMode, settings.wallpaperPlayback, settings.wallpaperSlideIntervalSec])
+  }, [settings.backgroundMode, settings.wallpaperPlayback, slideshowIntervalMs])
 
   useEffect(() => {
     if (hasUnsplashApi || settings.backgroundMode !== "unsplash") return
     if (settings.wallpaperPlayback !== "slideshow") return
-    const sec = Math.max(15, settings.wallpaperSlideIntervalSec)
     const len = Math.max(1, effectiveCuratedUrls.length)
     const id = window.setInterval(() => {
       setSlideIndex((i) => (i + 1) % len)
-    }, sec * 1000)
+    }, slideshowIntervalMs)
     return () => window.clearInterval(id)
-  }, [settings.backgroundMode, settings.wallpaperPlayback, settings.wallpaperSlideIntervalSec, effectiveCuratedUrls.length])
+  }, [settings.backgroundMode, settings.wallpaperPlayback, slideshowIntervalMs, effectiveCuratedUrls.length])
 
   useEffect(() => {
     if (hasUnsplashApi || settings.backgroundMode !== "unsplash") return
@@ -97,10 +102,11 @@ export function useWallpaperDisplay(settings: AppSettings) {
 
     const loadId = ++wallpaperLoadGenRef.current
     let cancelled = false
+    const isStale = () => cancelled || loadId !== wallpaperLoadGenRef.current
 
-    function applyDisplay(url: string, trackAsBlob: boolean) {
-      if (cancelled || loadId !== wallpaperLoadGenRef.current) return
-      if (trackAsBlob && url.startsWith("blob:")) {
+    function commitDisplay(url: string, trackBlob: boolean) {
+      if (isStale()) return
+      if (trackBlob && url.startsWith("blob:")) {
         revokeWallpaperBlobUrl()
         wallpaperObjectUrlRef.current = url
       }
@@ -108,20 +114,19 @@ export function useWallpaperDisplay(settings: AppSettings) {
     }
 
     void (async () => {
-      const cachedObjUrl = await getCachedWallpaperObjectUrl(sourceUrl)
-      if (cancelled || loadId !== wallpaperLoadGenRef.current) {
-        if (cachedObjUrl) URL.revokeObjectURL(cachedObjUrl)
+      const cached = await getCachedWallpaperObjectUrl(sourceUrl)
+      if (isStale()) {
+        if (cached) URL.revokeObjectURL(cached)
         return
       }
-
-      if (cachedObjUrl) applyDisplay(cachedObjUrl, true)
+      if (cached) commitDisplay(cached, true)
 
       try {
         const blob = await fetchAndCacheWallpaper(sourceUrl)
-        if (cancelled || loadId !== wallpaperLoadGenRef.current) return
+        if (isStale()) return
         void putWallpaperBlob(sourceUrl, blob)
         const freshUrl = URL.createObjectURL(blob)
-        if (cancelled || loadId !== wallpaperLoadGenRef.current) {
+        if (isStale()) {
           URL.revokeObjectURL(freshUrl)
           return
         }
@@ -129,13 +134,11 @@ export function useWallpaperDisplay(settings: AppSettings) {
         wallpaperObjectUrlRef.current = freshUrl
         setDisplayBgUrl(freshUrl)
       } catch {
-        if (cancelled || loadId !== wallpaperLoadGenRef.current) return
-        if (!wallpaperObjectUrlRef.current) {
-          const img = new Image()
-          img.onload = () => applyDisplay(sourceUrl, false)
-          img.onerror = () => applyDisplay(FALLBACK_BG, false)
-          img.src = sourceUrl
-        }
+        if (isStale() || wallpaperObjectUrlRef.current) return
+        const img = new Image()
+        img.onload = () => commitDisplay(sourceUrl, false)
+        img.onerror = () => commitDisplay(FALLBACK_BG, false)
+        img.src = sourceUrl
       }
     })()
 
