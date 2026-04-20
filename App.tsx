@@ -10,8 +10,6 @@ import { settingsStorageCodec, shortcutsStorageCodec, notesStorageCodec } from "
 import { useLocalStorageState } from "./hooks/useLocalStorageState"
 import { useWallpaperDisplay } from "./hooks/useWallpaperDisplay"
 import { useClock } from "./hooks/useClock"
-import { useBlockDevShortcutsInProduction } from "./hooks/useBlockDevShortcutsInProduction"
-import { ToolsPanel } from "./tools"
 import SettingsModal from "./components/SettingsModal"
 import {
   editShortcutInTree,
@@ -32,8 +30,6 @@ function App() {
   const [isZenFocus, setIsZenFocus] = useState(true)
   const time = useClock()
   const displayBgUrl = useWallpaperDisplay(settings)
-
-  useBlockDevShortcutsInProduction()
 
   const updateSettings = (newPartial: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...newPartial }))
@@ -121,7 +117,6 @@ function App() {
       </div>
 
       <div className="fixed top-6 right-6 z-50 flex gap-3 p-2 -m-2 opacity-0 transition-opacity duration-300 hover:opacity-100 focus-within:opacity-100">
-        <ToolsPanel />
         <button
           onClick={() => setIsSettingsOpen(true)}
           className="p-3 rounded-full bg-white/5 hover:bg-white/10 backdrop-blur-md text-white/60 hover:text-white transition-all duration-300 group shadow-lg border border-white/5"
