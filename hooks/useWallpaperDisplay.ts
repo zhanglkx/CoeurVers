@@ -8,7 +8,7 @@ import {
 } from "../services/background"
 import { getCachedWallpaperObjectUrl, putWallpaperBlob, fetchAndCacheWallpaper } from "../services/wallpaper-cache"
 
-export const FALLBACK_BG = "/bg.jpg"
+export const FALLBACK_BG = "/bg.jpeg"
 
 export function useWallpaperDisplay(settings: AppSettings) {
   const [unsplashBg, setUnsplashBg] = useState<BackgroundFetchResult | null>(null)
