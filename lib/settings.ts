@@ -9,7 +9,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   wallpaperFavoriteUrls: [],
   wallpaperFixedIndex: 0,
   blurLevel: 1,
-  gridConfig: { rows: 4, cols: 8, iconSize: 84, gapX: 0, gapY: 0 },
+  gridConfig: { rows: 4, cols: 10, iconSize: 54, gapX: 0, gapY: 0 },
   openInNewTab: true,
 }
 

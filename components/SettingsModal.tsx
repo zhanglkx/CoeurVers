@@ -593,10 +593,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
 
                 {/* Columns / Rows */}
                 <div className="pt-4 border-t border-white/10">
-                  <label className="text-sm font-medium text-gray-400 uppercase tracking-wider block mb-3">Grid Dimensions</label>
+                  <label className="text-sm font-medium text-gray-400 uppercase tracking-wider block mb-3">
+                    书签网格（每页列数）
+                  </label>
+                  <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+                    主界面为左侧分页 + 中间可滚动区域；列数控制每行图标数量，内容超出时在同一页内纵向滚动。
+                  </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs text-gray-500 mb-1 block">Columns</label>
+                      <label className="text-xs text-gray-500 mb-1 block">列数</label>
                       <input
                         type="number"
                         min="3"
@@ -611,7 +616,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500 mb-1 block">Rows</label>
+                      <label className="text-xs text-gray-500 mb-1 block">行数（预留）</label>
+                      <p className="text-[10px] text-gray-600 mb-1.5 leading-snug">当前主界面不按行数截断，仅保留与导出配置兼容。</p>
                       <input
                         type="number"
                         min="2"
@@ -667,9 +673,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                       <span className="text-white ml-2">{settings.blurLevel}px</span>
                     </div>
                     <div>
-                      <span className="text-gray-400">Grid Size:</span>
+                      <span className="text-gray-400">书签网格:</span>
                       <span className="text-white ml-2">
-                        {settings.gridConfig.cols}×{settings.gridConfig.rows}
+                        {settings.gridConfig.cols} 列（行数 {settings.gridConfig.rows} 为预留）
                       </span>
                     </div>
                     <div>
