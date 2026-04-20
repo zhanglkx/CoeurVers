@@ -119,6 +119,7 @@ interface ShortcutGridProps {
   bookmarkNav: BookmarkNavState
   onBookmarkNavChange: (next: BookmarkNavState) => void
   onAddShortcutUnderParent: (parentKey: string, shortcut: Shortcut) => void
+  onAddRootFolder: (folder: Shortcut) => void
   onRemoveShortcut: (id: string) => void
   onEditShortcut: (id: string, title: string, url: string, iconPatch?: string | null) => void
   onReorderSiblings: (parentKey: string, dragId: string, targetId: string) => void
@@ -404,6 +405,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
   bookmarkNav,
   onBookmarkNavChange,
   onAddShortcutUnderParent,
+  onAddRootFolder,
   onRemoveShortcut,
   onEditShortcut,
   onReorderSiblings,
@@ -441,6 +443,12 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
   const mergeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pageDragOverId, setPageDragOverId] = useState<string | null>(null)
   const pageDragSourceRef = useRef<string | null>(null)
+
+  // Page tab context menu + inline rename
+  const [pageContextMenu, setPageContextMenu] = useState<{ x: number; y: number; pageId: string } | null>(null)
+  const [renamingPageId, setRenamingPageId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const renameInputRef = useRef<HTMLInputElement>(null)
 
   const sidebarPages = useMemo(() => {
     const loose = getLooseShortcuts(shortcuts)
@@ -905,12 +913,63 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
     onReorderRootFolders(dragId, targetFolderId)
   }
 
+  // --- Page Tab Context Menu Handlers ---
+
+  const handlePageTabContextMenu = (e: React.MouseEvent, pageId: string) => {
+    e.preventDefault()
+    setPageContextMenu({ x: e.clientX, y: e.clientY, pageId })
+  }
+
+  const handleContextAddPage = () => {
+    const newFolder: Shortcut = {
+      id: `folder-${Date.now()}`,
+      title: '新页面',
+      url: '',
+      type: 'folder',
+      children: [],
+    }
+    onAddRootFolder(newFolder)
+    setPageContextMenu(null)
+  }
+
+  const handleContextRename = () => {
+    if (!pageContextMenu) return
+    const page = sidebarPages.find((p) => p.id === pageContextMenu.pageId)
+    if (!page || page.id === ITAB_LOOSE_PARENT_KEY) return
+    setRenamingPageId(pageContextMenu.pageId)
+    setRenameValue(page.title)
+    setPageContextMenu(null)
+  }
+
+  const handleContextDelete = () => {
+    if (!pageContextMenu) return
+    const { pageId } = pageContextMenu
+    setPageContextMenu(null)
+    if (pageId === ITAB_LOOSE_PARENT_KEY) return
+    onRemoveShortcut(pageId)
+  }
+
+  const handleRenameSubmit = () => {
+    if (!renamingPageId) { setRenamingPageId(null); return }
+    const trimmed = renameValue.trim()
+    if (trimmed) {
+      const folder = shortcuts.find((s) => s.id === renamingPageId)
+      onEditShortcut(renamingPageId, trimmed, folder?.url ?? '')
+    }
+    setRenamingPageId(null)
+  }
+
   return (
     <>
     <div className="z-10 mx-auto flex h-full min-h-0 max-h-full w-full min-w-0 max-w-[90vw] gap-4 px-0">
       <aside
         className="scrollbar-hide flex h-full max-h-full min-h-0 w-32 shrink-0 flex-col gap-1 overflow-y-auto overflow-x-hidden rounded-2xl border border-white/10 bg-black/25 py-2 backdrop-blur-md"
         aria-label="书签分页"
+        onContextMenu={(e) => {
+          if ((e.target as HTMLElement).closest('button[role="tab"]')) return
+          e.preventDefault()
+          setPageContextMenu({ x: e.clientX, y: e.clientY, pageId: '' })
+        }}
       >
         <div
           role="tablist"
@@ -935,6 +994,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
           {sidebarPages.map((page) => {
             const isActive = bookmarkNav.activePageId === page.id
             const isDraggable = page.id !== ITAB_LOOSE_PARENT_KEY
+            const isRenaming = renamingPageId === page.id
             return (
               <button
                 key={page.id}
@@ -943,22 +1003,55 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
                 aria-selected={isActive}
                 id={`bookmark-tab-${page.id}`}
                 aria-controls="bookmark-panel"
-                draggable={isDraggable}
+                draggable={isDraggable && !isRenaming}
                 onDragStart={(e) => handlePageTabDragStart(e, page.id)}
                 onDragEnd={handlePageTabDragEnd}
                 onDragOver={(e) => handlePageTabDragOver(e, page.id)}
                 onDrop={(e) => handlePageTabDrop(e, page.id)}
-                onClick={() => onBookmarkNavChange({ activePageId: page.id, drillFolderIds: [] })}
-                className={`rounded-xl px-2.5 py-2 text-left transition-colors ${
+                onContextMenu={(e) => handlePageTabContextMenu(e, page.id)}
+                onClick={() => {
+                  if (isRenaming) return
+                  onBookmarkNavChange({ activePageId: page.id, drillFolderIds: [] })
+                }}
+                className={`w-full rounded-xl px-2.5 py-2 text-left transition-colors ${
                   isActive
                     ? 'bg-white/15 text-white shadow-inner ring-1 ring-white/15'
                     : 'text-white/75 hover:bg-white/10 hover:text-white'
                 } ${pageDragOverId === page.id ? 'ring-2 ring-amber-400/50' : ''}`}
               >
-                <span className="line-clamp-3 text-[11px] font-medium leading-snug">{page.title}</span>
+                {isRenaming ? (
+                  <input
+                    ref={renameInputRef}
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={handleRenameSubmit}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); handleRenameSubmit() }
+                      if (e.key === 'Escape') setRenamingPageId(null)
+                      e.stopPropagation()
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                    className="w-full bg-transparent text-[13px] font-medium text-white outline-none caret-white"
+                  />
+                ) : (
+                  <span className="line-clamp-3 text-[13px] font-medium leading-snug">{page.title}</span>
+                )}
               </button>
             )
           })}
+        </div>
+
+        <div className="mt-auto px-1.5 pb-1 pt-1">
+          <button
+            type="button"
+            title="新建页面"
+            onClick={handleContextAddPage}
+            className="flex w-full items-center justify-center gap-1 rounded-xl py-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-white/80"
+          >
+            <Plus size={14} />
+            <span className="text-[11px]">新建页面</span>
+          </button>
         </div>
       </aside>
 
@@ -1492,6 +1585,54 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
       )}
 
     </div>
+
+    {/* Page tab context menu */}
+    {pageContextMenu && createPortal(
+      <>
+        <div
+          className="fixed inset-0 z-[200]"
+          onClick={() => setPageContextMenu(null)}
+          onContextMenu={(e) => { e.preventDefault(); setPageContextMenu(null) }}
+        />
+        <div
+          className="fixed z-[201] min-w-[140px] overflow-hidden rounded-xl border border-white/10 bg-black/80 py-1 shadow-2xl backdrop-blur-xl"
+          style={{ left: pageContextMenu.x, top: pageContextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={handleContextAddPage}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-white/90 transition-colors hover:bg-white/10"
+          >
+            <Plus size={14} className="shrink-0 text-white/60" />
+            新建页面
+          </button>
+          {pageContextMenu.pageId && pageContextMenu.pageId !== ITAB_LOOSE_PARENT_KEY && (
+            <>
+              <button
+                type="button"
+                onClick={handleContextRename}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-white/90 transition-colors hover:bg-white/10"
+              >
+                <Pencil size={14} className="shrink-0 text-white/60" />
+                重命名
+              </button>
+              <div className="my-1 border-t border-white/10" />
+              <button
+                type="button"
+                onClick={handleContextDelete}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-red-400 transition-colors hover:bg-red-500/15"
+              >
+                <Trash2 size={14} className="shrink-0" />
+                删除页面
+              </button>
+            </>
+          )}
+        </div>
+      </>,
+      document.body
+    )}
+
     </>
   );
 };

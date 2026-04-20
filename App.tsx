@@ -83,6 +83,10 @@ function App() {
     setShortcuts((prev) => moveShortcutFromFolderToRoot(prev, folderId, itemId))
   }
 
+  const addRootFolder = (folder: Shortcut) => {
+    setShortcuts((prev) => [...prev, folder])
+  }
+
   const handleBookmarkNavChange = useCallback((next: BookmarkNavState) => {
     setBookmarkNav(next)
   }, [setBookmarkNav])
@@ -132,6 +136,7 @@ function App() {
             bookmarkNav={bookmarkNav}
             onBookmarkNavChange={handleBookmarkNavChange}
             onAddShortcutUnderParent={addShortcutUnderParent}
+            onAddRootFolder={addRootFolder}
             onRemoveShortcut={removeShortcut}
             onEditShortcut={editShortcut}
             onReorderSiblings={handleReorderSiblings}
