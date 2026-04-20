@@ -285,6 +285,25 @@ const ShortcutItem: React.FC<{
     openInNewTab
 }) => {
   const isFolder = shortcut.type === 'folder';
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!contextMenuOpen) return
+    function handleOutside(e: MouseEvent) {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node))
+        setContextMenuOpen(false)
+    }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setContextMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [contextMenuOpen])
 
   return (
     <div 
@@ -292,6 +311,11 @@ const ShortcutItem: React.FC<{
             ${isReorderTarget ? 'translate-x-2 opacity-80' : ''}
         `}
         style={{ width: `${size + 20}px` }} // slightly larger than icon for label space
+        onContextMenu={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setContextMenuOpen(true)
+        }}
         onDragOver={(e) => onItemDragOver(e, shortcut.id)}
         onDragLeave={onItemDragLeave}
         onDrop={(e) => onItemDrop(e, shortcut.id)}
@@ -301,37 +325,41 @@ const ShortcutItem: React.FC<{
              <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-12 bg-blue-500 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)] z-0 animate-pulse" />
         )}
 
-        {/* 角标：编辑 / 删除 */}
-        <div
-          className="pointer-events-auto absolute -top-1 right-0 z-30 flex gap-0.5 rounded-lg bg-black/55 p-0.5 opacity-0 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
-        >
-          <button
-            type="button"
-            draggable={false}
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(shortcut.id);
-            }}
-            className="rounded-md p-1.5 text-white/90 hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
-            aria-label="编辑"
-            title="编辑"
+        {/* 右键菜单：编辑 / 删除 */}
+        {contextMenuOpen && (
+          <div
+            ref={contextMenuRef}
+            className="pointer-events-auto absolute -top-2 left-full z-50 ml-1.5 min-w-[160px] overflow-hidden rounded-2xl bg-neutral-900/85 p-1.5 shadow-2xl ring-1 ring-white/10 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150"
           >
-            <Pencil size={14} className="opacity-90" />
-          </button>
-          <button
-            type="button"
-            draggable={false}
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove(shortcut.id);
-            }}
-            className="rounded-md p-1.5 text-red-300 hover:bg-red-500/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/50"
-            aria-label="删除"
-            title="删除"
-          >
-            <Trash2 size={14} className="opacity-90" />
-          </button>
-        </div>
+            <button
+              type="button"
+              draggable={false}
+              onClick={(e) => {
+                e.stopPropagation()
+                setContextMenuOpen(false)
+                onEdit(shortcut.id)
+              }}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/90 transition-colors hover:bg-white/10 focus:outline-none active:bg-white/15"
+            >
+              <Pencil size={15} className="shrink-0 opacity-75" />
+              <span>编辑</span>
+            </button>
+            <div className="mx-3 my-1 h-px bg-white/10" />
+            <button
+              type="button"
+              draggable={false}
+              onClick={(e) => {
+                e.stopPropagation()
+                setContextMenuOpen(false)
+                onRemove(shortcut.id)
+              }}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-red-400 transition-colors hover:bg-red-500/15 focus:outline-none active:bg-red-500/25"
+            >
+              <Trash2 size={15} className="shrink-0 opacity-75" />
+              <span>删除</span>
+            </button>
+          </div>
+        )}
 
       <button
         type="button"
@@ -983,6 +1011,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
             columnGap: bookmarkGapX,
             rowGap: bookmarkGapY,
             justifyContent: 'center',
+            alignContent: 'flex-start',
           }}
           onDragOver={(e) => e.preventDefault()}
           onDragLeave={() => {
