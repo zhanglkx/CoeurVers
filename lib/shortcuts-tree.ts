@@ -1,9 +1,23 @@
 import type { Shortcut } from "../types"
 
-export function editShortcutInTree(items: Shortcut[], id: string, title: string, url: string): Shortcut[] {
+export function editShortcutInTree(
+  items: Shortcut[],
+  id: string,
+  title: string,
+  url: string,
+  iconPatch?: string | null,
+): Shortcut[] {
   return items.map((s) => {
-    if (s.id === id) return { ...s, title, url }
-    if (s.children?.length) return { ...s, children: editShortcutInTree(s.children, id, title, url) }
+    if (s.id === id) {
+      if (s.type === "folder") return { ...s, title, url }
+      if (iconPatch === undefined) return { ...s, title, url }
+      if (iconPatch === null) {
+        const { icon: _removed, ...rest } = s
+        return { ...rest, title, url }
+      }
+      return { ...s, title, url, icon: iconPatch }
+    }
+    if (s.children?.length) return { ...s, children: editShortcutInTree(s.children, id, title, url, iconPatch) }
     return s
   })
 }

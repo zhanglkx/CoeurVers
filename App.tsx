@@ -42,8 +42,8 @@ function App() {
     setShortcuts((prev) => prev.filter((s) => s.id !== id))
   }
 
-  const editShortcut = (id: string, title: string, url: string) => {
-    setShortcuts((prev) => editShortcutInTree(prev, id, title, url))
+  const editShortcut = (id: string, title: string, url: string, iconPatch?: string | null) => {
+    setShortcuts((prev) => editShortcutInTree(prev, id, title, url, iconPatch))
   }
 
   const handleReorder = (dragId: string, targetId: string) => {
