@@ -63,8 +63,8 @@ function App() {
     setShortcuts((prev) => removeShortcutDeep(prev, id))
   }
 
-  const editShortcut = (id: string, title: string, url: string, iconPatch?: string | null) => {
-    setShortcuts((prev) => editShortcutInTree(prev, id, title, url, iconPatch))
+  const editShortcut = (id: string, title: string, url: string, iconPatch?: string | null, iconBgColorPatch?: string | null) => {
+    setShortcuts((prev) => editShortcutInTree(prev, id, title, url, iconPatch, iconBgColorPatch))
   }
 
   const handleReorderSiblings = (parentKey: string, dragId: string, targetId: string) => {

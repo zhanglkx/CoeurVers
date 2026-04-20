@@ -12,6 +12,25 @@ import { TEXT_ICON_SWATCHES, generateTextIconDataUrl } from '../lib/text-icon';
 // Global cache for failed favicons to prevent flicker/re-fetching
 const FAILED_FAVICONS = new Set<string>();
 
+/** Preset swatches for icon container background color. null = transparent (default). */
+const ICON_BG_PRESETS: Array<{ label: string; value: string | null }> = [
+  { label: '透明', value: null },
+  { label: '白色', value: '#ffffff' },
+  { label: '深色', value: '#1c1c1e' },
+  { label: '红色', value: '#dc2626' },
+  { label: '橙色', value: '#ea580c' },
+  { label: '黄色', value: '#ca8a04' },
+  { label: '绿色', value: '#16a34a' },
+  { label: '青色', value: '#0891b2' },
+  { label: '蓝色', value: '#2563eb' },
+  { label: '紫色', value: '#7c3aed' },
+  { label: '粉色', value: '#db2777' },
+  { label: '渐变橙', value: 'linear-gradient(135deg,#f97316,#eab308)' },
+  { label: '渐变绿', value: 'linear-gradient(135deg,#22c55e,#14b8a6)' },
+  { label: '渐变蓝', value: 'linear-gradient(135deg,#3b82f6,#8b5cf6)' },
+  { label: '渐变粉', value: 'linear-gradient(135deg,#a855f7,#ec4899)' },
+]
+
 function findShortcutById(list: Shortcut[], id: string): Shortcut | null {
   for (const s of list) {
     if (s.id === id) return s
@@ -121,7 +140,7 @@ interface ShortcutGridProps {
   onAddShortcutUnderParent: (parentKey: string, shortcut: Shortcut) => void
   onAddRootFolder: (folder: Shortcut) => void
   onRemoveShortcut: (id: string) => void
-  onEditShortcut: (id: string, title: string, url: string, iconPatch?: string | null) => void
+  onEditShortcut: (id: string, title: string, url: string, iconPatch?: string | null, iconBgColorPatch?: string | null) => void
   onReorderSiblings: (parentKey: string, dragId: string, targetId: string) => void
   onMergeSiblings: (parentKey: string, dragId: string, dropId: string) => void
   onReorderRootFolders: (dragId: string, targetId: string) => void
@@ -269,6 +288,7 @@ const ShortcutItem: React.FC<{
     onItemDragOver: (e: React.DragEvent, id: string) => void,
     onItemDragLeave: (e: React.DragEvent) => void,
     onItemDrop: (e: React.DragEvent, id: string) => void,
+    onItemDragEnd: () => void,
     size: number,
     openInNewTab: boolean
 }> = ({ 
@@ -282,6 +302,7 @@ const ShortcutItem: React.FC<{
     onItemDragOver,
     onItemDragLeave,
     onItemDrop,
+    onItemDragEnd,
     size,
     openInNewTab
 }) => {
@@ -366,6 +387,7 @@ const ShortcutItem: React.FC<{
         type="button"
         draggable={true}
         onDragStart={(e) => onItemDragStart(e, shortcut.id)}
+        onDragEnd={onItemDragEnd}
         onClick={() => {
           if (isFolder) {
             onClickFolder(shortcut);
@@ -382,8 +404,12 @@ const ShortcutItem: React.FC<{
         `}
       >
         <div 
-            className="relative mb-2 flex items-center justify-center overflow-hidden rounded-xl bg-transparent ring-1 ring-white/10 transition-all duration-300 hover:ring-white/20"
-            style={{ width: `${size}px`, height: `${size}px` }}
+            className="relative mb-2 flex items-center justify-center overflow-hidden rounded-xl ring-1 ring-white/10 transition-all duration-300 hover:ring-white/20"
+            style={{
+              width: `${size}px`,
+              height: `${size}px`,
+              background: shortcut.iconBgColor ?? 'transparent',
+            }}
         >
           {isFolder && shortcut.children ? (
              <FolderPreview children={shortcut.children} />
@@ -432,6 +458,8 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
   const [editOfficialUrl, setEditOfficialUrl] = useState<string | null>(null);
   const [editTextSwatchIndex, setEditTextSwatchIndex] = useState(0);
   const [editUploadDataUrl, setEditUploadDataUrl] = useState<string | null>(null);
+  const [editIconBgColor, setEditIconBgColor] = useState<string | null>(null);
+  const [addIconBgColor, setAddIconBgColor] = useState<string | null>(null);
   const [iconFetchError, setIconFetchError] = useState<string | null>(null);
   const [isFetchingIcon, setIsFetchingIcon] = useState(false);
   const iconFileInputRef = useRef<HTMLInputElement>(null);
@@ -443,6 +471,9 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
   const mergeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pageDragOverId, setPageDragOverId] = useState<string | null>(null)
   const pageDragSourceRef = useRef<string | null>(null)
+  // Track whether a shortcut item is being dragged and whether cursor is outside the component
+  const [isDraggingItem, setIsDraggingItem] = useState(false)
+  const [isDragOutside, setIsDragOutside] = useState(false)
 
   // Page tab context menu + inline rename
   const [pageContextMenu, setPageContextMenu] = useState<{ x: number; y: number; pageId: string } | null>(null)
@@ -633,6 +664,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
       url: formattedUrl,
       type: 'link',
       icon,
+      ...(addIconBgColor ? { iconBgColor: addIconBgColor } : {}),
     };
 
     onAddShortcutUnderParent(currentParentKey, newShortcut)
@@ -649,6 +681,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
       setAddUploadDataUrl(null);
       setAddIconFetchError(null);
       setAddIsFetchingIcon(false);
+      setAddIconBgColor(null);
   }
 
   const openAddModal = () => {
@@ -660,6 +693,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
     setAddUploadDataUrl(null);
     setAddIconFetchError(null);
     setAddIsFetchingIcon(false);
+    setAddIconBgColor(null);
     setIsAdding(true);
   }
 
@@ -709,6 +743,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
       setEditOfficialUrl(null);
       setEditTextSwatchIndex(0);
       setEditUploadDataUrl(null);
+      setEditIconBgColor(shortcut.iconBgColor ?? null);
       setIconFetchError(null);
       setIsFetchingIcon(false);
       setIsEditing(true);
@@ -728,6 +763,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
       setEditOfficialUrl(null);
       setEditTextSwatchIndex(0);
       setEditUploadDataUrl(null);
+      setEditIconBgColor(null);
       setIconFetchError(null);
       setIsFetchingIcon(false);
   }
@@ -795,8 +831,11 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
             iconPatch = generateTextIconDataUrl(editName, TEXT_ICON_SWATCHES[editTextSwatchIndex] ?? TEXT_ICON_SWATCHES[0])
           else if (editIconSource === 'upload' && editUploadDataUrl)
             iconPatch = editUploadDataUrl
-          
-          onEditShortcut(editingShortcut.id, editName, formattedUrl, iconPatch);
+
+          // null removes existing bg color; string sets new one; undefined = no change (but we always pass it)
+          const iconBgColorPatch: string | null = editIconBgColor ?? null
+
+          onEditShortcut(editingShortcut.id, editName, formattedUrl, iconPatch, iconBgColorPatch);
       }
       closeEditModal();
   }
@@ -807,6 +846,17 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
     e.dataTransfer.setData('shortcut-id', id)
     e.dataTransfer.setData('parent-key', currentParentKey)
     e.dataTransfer.effectAllowed = 'move'
+    setIsDraggingItem(true)
+    setIsDragOutside(false)
+  }
+
+  const handleDragEnd = () => {
+    setIsDraggingItem(false)
+    setIsDragOutside(false)
+    setDragOverId(null)
+    setMergeTargetId(null)
+    setIsDragOverAddButton(false)
+    if (mergeTimerRef.current) clearTimeout(mergeTimerRef.current)
   }
 
   const handleDragOver = (e: React.DragEvent, id: string) => {
@@ -875,13 +925,16 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
 
   const handleBackdropDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    const draggedId = e.dataTransfer.getData('shortcut-id')
-    const dragParentKey = e.dataTransfer.getData('parent-key')
-    if (draggedId && dragParentKey && dragParentKey !== ITAB_LOOSE_PARENT_KEY) {
-      onMoveToRoot(dragParentKey, draggedId)
-    }
+    // Blank space inside the grid does nothing — deletion only happens when dropping outside the component
     setDragOverId(null)
     setMergeTargetId(null)
+  }
+
+  const handleOutsideDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const draggedId = e.dataTransfer.getData('shortcut-id')
+    if (draggedId) onRemoveShortcut(draggedId)
+    handleDragEnd()
   }
 
   const handlePageTabDragStart = (e: React.DragEvent, folderId: string) => {
@@ -961,7 +1014,34 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
 
   return (
     <>
-    <div className="z-10 mx-auto flex h-full min-h-0 max-h-full w-full min-w-0 max-w-[90vw] gap-4 px-0">
+    {/* Full-page delete zone — rendered behind the component (z-[5] < z-10).
+        Drag events only reach this overlay when the cursor leaves the ShortcutGrid area. */}
+    {isDraggingItem && createPortal(
+      <div
+        className={`fixed inset-0 z-[5] flex items-center justify-center transition-all duration-200 ${
+          isDragOutside
+            ? 'bg-red-500/20'
+            : 'bg-transparent pointer-events-none'
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault()
+          if (!isDragOutside) setIsDragOutside(true)
+        }}
+        onDrop={handleOutsideDrop}
+      >
+        {isDragOutside && (
+          <div className="pointer-events-none flex flex-col items-center gap-3 rounded-3xl border border-red-400/40 bg-black/50 px-10 py-6 shadow-2xl backdrop-blur-sm">
+            <Trash2 size={36} className="text-red-400 opacity-80" />
+            <span className="text-sm font-medium text-red-300/80">松开以删除</span>
+          </div>
+        )}
+      </div>,
+      document.body
+    )}
+    <div
+      className="z-10 mx-auto flex h-full min-h-0 max-h-full w-full min-w-0 max-w-[90vw] gap-4 px-0"
+      onDragEnter={() => setIsDragOutside(false)}
+    >
       <aside
         className="scrollbar-hide flex h-full max-h-full min-h-0 w-32 shrink-0 flex-col gap-1 overflow-y-auto overflow-x-hidden rounded-2xl border border-white/10 bg-black/25 py-2 backdrop-blur-md"
         aria-label="书签分页"
@@ -1106,6 +1186,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
             justifyContent: 'center',
             alignContent: 'flex-start',
           }}
+          onDragEnter={() => setIsDragOutside(false)}
           onDragOver={(e) => e.preventDefault()}
           onDragLeave={() => {
             setDragOverId(null)
@@ -1129,6 +1210,7 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
                 onItemDragOver={handleDragOver}
                 onItemDragLeave={handleDragLeave}
                 onItemDrop={handleDrop}
+                onItemDragEnd={handleDragEnd}
                 isMergeTarget={mergeTargetId === cell.shortcut.id}
                 isReorderTarget={
                   dragOverId === cell.shortcut.id && mergeTargetId !== cell.shortcut.id
@@ -1253,6 +1335,34 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
                       title="文字图标底色"
                     />
                   ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">图标背景颜色</label>
+                <div className="flex flex-wrap gap-2">
+                  {ICON_BG_PRESETS.map((preset, i) => {
+                    const isSelected = addIconBgColor === preset.value
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setAddIconBgColor(preset.value)}
+                        title={preset.label}
+                        className={`h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 ${
+                          isSelected ? 'border-amber-400 scale-110' : 'border-white/20'
+                        }`}
+                        style={
+                          preset.value === null
+                            ? {
+                                background:
+                                  'repeating-conic-gradient(#555 0% 25%, #333 0% 50%) 0 0 / 10px 10px',
+                              }
+                            : { background: preset.value }
+                        }
+                      />
+                    )
+                  })}
                 </div>
               </div>
 
@@ -1457,6 +1567,34 @@ const ShortcutGrid: React.FC<ShortcutGridProps> = ({
                           title="文字图标底色"
                         />
                       ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">图标背景颜色</label>
+                    <div className="flex flex-wrap gap-2">
+                      {ICON_BG_PRESETS.map((preset, i) => {
+                        const isSelected = editIconBgColor === preset.value
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setEditIconBgColor(preset.value)}
+                            title={preset.label}
+                            className={`h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 ${
+                              isSelected ? 'border-amber-400 scale-110' : 'border-white/20'
+                            }`}
+                            style={
+                              preset.value === null
+                                ? {
+                                    background:
+                                      'repeating-conic-gradient(#555 0% 25%, #333 0% 50%) 0 0 / 10px 10px',
+                                  }
+                                : { background: preset.value }
+                            }
+                          />
+                        )
+                      })}
                     </div>
                   </div>
 

@@ -8,6 +8,7 @@ export interface Shortcut {
   title: string
   url: string
   icon?: string
+  iconBgColor?: string
   type?: "link" | "folder"
   children?: Shortcut[]
 }

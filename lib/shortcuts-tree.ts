@@ -140,18 +140,35 @@ export function editShortcutInTree(
   title: string,
   url: string,
   iconPatch?: string | null,
+  iconBgColorPatch?: string | null,
 ): Shortcut[] {
   return items.map((s) => {
     if (s.id === id) {
       if (s.type === "folder") return { ...s, title, url }
-      if (iconPatch === undefined) return { ...s, title, url }
-      if (iconPatch === null) {
-        const { icon: _removed, ...rest } = s
-        return { ...rest, title, url }
+
+      let updated: Shortcut = { ...s, title, url }
+
+      if (iconPatch !== undefined) {
+        if (iconPatch === null) {
+          const { icon: _removed, ...rest } = updated
+          updated = rest as Shortcut
+        } else {
+          updated = { ...updated, icon: iconPatch }
+        }
       }
-      return { ...s, title, url, icon: iconPatch }
+
+      if (iconBgColorPatch !== undefined) {
+        if (iconBgColorPatch === null) {
+          const { iconBgColor: _removed, ...rest } = updated
+          updated = rest as Shortcut
+        } else {
+          updated = { ...updated, iconBgColor: iconBgColorPatch }
+        }
+      }
+
+      return updated
     }
-    if (s.children?.length) return { ...s, children: editShortcutInTree(s.children, id, title, url, iconPatch) }
+    if (s.children?.length) return { ...s, children: editShortcutInTree(s.children, id, title, url, iconPatch, iconBgColorPatch) }
     return s
   })
 }
