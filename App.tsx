@@ -2,11 +2,11 @@ import { useState } from "react"
 import { Settings as SettingsIcon } from "lucide-react"
 import ShortcutGrid from "./components/ShortcutGrid"
 import { ZenClockPanel } from "./components/ZenClockPanel"
-import type { AppSettings, Shortcut, Note } from "./types"
+import type { AppSettings, Shortcut } from "./types"
 import { DEFAULT_SHORTCUTS } from "./types"
 import { DEFAULT_SETTINGS, normalizeSettings } from "./lib/settings"
-import { STORAGE_KEY_SETTINGS, STORAGE_KEY_SHORTCUTS, STORAGE_KEY_NOTES } from "./lib/storage-keys"
-import { settingsStorageCodec, shortcutsStorageCodec, notesStorageCodec } from "./lib/storage-codecs"
+import { STORAGE_KEY_SETTINGS, STORAGE_KEY_SHORTCUTS } from "./lib/storage-keys"
+import { settingsStorageCodec, shortcutsStorageCodec } from "./lib/storage-codecs"
 import { useLocalStorageState } from "./hooks/useLocalStorageState"
 import { useWallpaperDisplay } from "./hooks/useWallpaperDisplay"
 import { useClock } from "./hooks/useClock"
@@ -24,7 +24,6 @@ const ZEN_GREETING = "Think Different"
 function App() {
   const [settings, setSettings] = useLocalStorageState(STORAGE_KEY_SETTINGS, () => DEFAULT_SETTINGS, settingsStorageCodec)
   const [shortcuts, setShortcuts] = useLocalStorageState(STORAGE_KEY_SHORTCUTS, () => DEFAULT_SHORTCUTS, shortcutsStorageCodec)
-  const [notes, setNotes] = useLocalStorageState(STORAGE_KEY_NOTES, () => [] as Note[], notesStorageCodec)
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isZenFocus, setIsZenFocus] = useState(true)
@@ -63,10 +62,9 @@ function App() {
     setShortcuts((prev) => moveShortcutFromFolderToRoot(prev, folderId, itemId))
   }
 
-  const handleImport = (data: { settings: AppSettings; shortcuts: Shortcut[]; notes?: Note[] }) => {
+  const handleImport = (data: { settings: AppSettings; shortcuts: Shortcut[] }) => {
     if (data.settings) setSettings(normalizeSettings(data.settings))
     if (data.shortcuts) setShortcuts(data.shortcuts)
-    if (data.notes) setNotes(data.notes)
   }
 
   const blurPx = settings.blurLevel
@@ -131,7 +129,6 @@ function App() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         shortcuts={shortcuts}
-        notes={notes}
         onUpdateSettings={updateSettings}
         onImport={handleImport}
       />
