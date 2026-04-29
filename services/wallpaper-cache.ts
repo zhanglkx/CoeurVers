@@ -1,11 +1,13 @@
+import { IDB_DATABASE_NAME, IDB_STORE_NAME, IDB_VERSION } from "../lib/app-constants"
+
 /**
  * Persist wallpaper images locally (IndexedDB) so refresh can paint from disk
  * before the network round-trip completes.
  */
 
-const DB_NAME = "coeurvers-wallpaper-v1"
-const STORE = "wallpapers"
-const DB_VERSION = 1
+const DB_NAME = IDB_DATABASE_NAME
+const STORE = IDB_STORE_NAME
+const DB_VERSION = IDB_VERSION
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {

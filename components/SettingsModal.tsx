@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Image as ImageIcon, Layout, Upload, Download, Save, Settings, ExternalLink, Heart, ImageOff } from "lucide-react";
+import { X, Image as ImageIcon, Layout, Upload, Download, Save, Settings, Heart, ImageOff } from "lucide-react";
 import { AppSettings, Shortcut } from "../types";
 import { hasUnsplashApi } from "../constants";
 import { CURATED_WALLPAPER_ITEMS, CURATED_WALLPAPER_URLS, getEffectiveCuratedWallpaperUrls } from "../services/background";
@@ -115,21 +115,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   const validateSettings = (settings: any): settings is AppSettings => {
     if (!settings || typeof settings !== "object") return false;
 
-    const legacyV1 =
-      "defaultEngine" in settings &&
-      "suggestServer" in settings &&
-      settings.backgroundImage !== undefined &&
+    const hasBaseShape =
       settings.blurLevel !== undefined &&
       settings.gridConfig &&
-      settings.openInNewTab !== undefined;
+      (settings.backgroundMode === "unsplash" ||
+        settings.backgroundMode === "upload" ||
+        settings.backgroundMode === undefined);
 
-    const v2 =
-      settings.blurLevel !== undefined &&
-      settings.gridConfig &&
-      settings.openInNewTab !== undefined &&
-      (settings.backgroundMode === "unsplash" || settings.backgroundMode === "upload" || settings.backgroundMode === undefined);
-
-    if (!legacyV1 && !v2) return false;
+    if (!hasBaseShape) return false;
 
     if (!settings.gridConfig || typeof settings.gridConfig !== "object") return false;
     const gridKeys = ["rows", "cols", "iconSize", "gapX", "gapY"];
@@ -142,8 +135,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
       typeof settings.gridConfig.cols === "number" &&
       typeof settings.gridConfig.iconSize === "number" &&
       typeof settings.gridConfig.gapX === "number" &&
-      typeof settings.gridConfig.gapY === "number" &&
-      typeof settings.openInNewTab === "boolean"
+      typeof settings.gridConfig.gapY === "number"
     );
   };
 
@@ -294,29 +286,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
           <div className="space-y-8">
             {activeTab === "general" && (
               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="space-y-3">
-                  <label className="text-sm font-medium text-gray-400 uppercase tracking-wider">Link Behavior</label>
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
-                    <div className="flex items-center">
-                      <ExternalLink size={18} className="text-blue-400 mr-3" />
-                      <div>
-                        <span className="text-white font-medium block">Open links in new tab</span>
-                        <span className="text-xs text-gray-400">When enabled, bookmark links will open in a new browser tab</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => onUpdateSettings({ openInNewTab: !settings.openInNewTab })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                        settings.openInNewTab ? "bg-blue-600" : "bg-gray-600"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          settings.openInNewTab ? "translate-x-6" : "translate-x-1"
-                        }`}
-                      />
-                    </button>
-                  </div>
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-300 leading-relaxed">
+                  点击书签图标将在 <span className="text-white font-medium">当前页面</span>打开链接。
+                  <br />
+                  <span className="text-xs text-gray-500">
+                    Chrome 会把当前的新标签页替换为目标网址，保持标签页数量不增长。
+                  </span>
                 </div>
               </div>
             )}

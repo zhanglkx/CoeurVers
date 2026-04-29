@@ -10,7 +10,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   wallpaperFixedIndex: 0,
   blurLevel: 1,
   gridConfig: { rows: 4, cols: 10, iconSize: 54, gapX: 16, gapY: 16 },
-  openInNewTab: true,
 }
 
 export function normalizeSettings(raw: unknown): AppSettings {
@@ -44,6 +43,5 @@ export function normalizeSettings(raw: unknown): AppSettings {
       gapX: typeof g.gapX === "number" ? g.gapX : DEFAULT_SETTINGS.gridConfig.gapX,
       gapY: typeof g.gapY === "number" ? g.gapY : DEFAULT_SETTINGS.gridConfig.gapY,
     },
-    openInNewTab: typeof r.openInNewTab === "boolean" ? r.openInNewTab : DEFAULT_SETTINGS.openInNewTab,
   }
 }

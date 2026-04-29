@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+import type { Dispatch, SetStateAction } from "react"
 
 interface LocalStorageCodec<T> {
   parse: (raw: string) => T
@@ -9,7 +10,7 @@ export function useLocalStorageState<T>(
   key: string,
   getDefault: () => T,
   codec: LocalStorageCodec<T>,
-): [T, React.Dispatch<React.SetStateAction<T>>] {
+): [T, Dispatch<SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
     try {
       const saved = localStorage.getItem(key)

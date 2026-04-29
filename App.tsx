@@ -19,17 +19,9 @@ import {
 import { useLocalStorageState } from "./hooks/useLocalStorageState"
 import { useWallpaperDisplay } from "./hooks/useWallpaperDisplay"
 import { useClock } from "./hooks/useClock"
+import { useShortcutActions } from "./hooks/useShortcutActions"
 import SettingsModal from "./components/SettingsModal"
-import {
-  addShortcutUnderParent as addShortcutUnderParentInTree,
-  editShortcutInTree,
-  ITAB_LOOSE_PARENT_KEY,
-  mergeSiblingsUnderParent,
-  moveShortcutFromFolderToRoot,
-  removeShortcutDeep,
-  reorderRootFolders,
-  reorderSiblingsUnderParent,
-} from "./lib/shortcuts-tree"
+import { ITAB_LOOSE_PARENT_KEY } from "./lib/shortcuts-tree"
 
 const ZEN_GREETING = "Think Different"
 
@@ -51,40 +43,11 @@ function App() {
   const time = useClock()
   const displayBgUrl = useWallpaperDisplay(settings)
 
+  // 使用 useShortcutActions hook 消除包装函数
+  const actions = useShortcutActions(setShortcuts)
+
   const updateSettings = (newPartial: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...newPartial }))
-  }
-
-  const addShortcutUnderParent = (parentKey: string, shortcut: Shortcut) => {
-    setShortcuts((prev) => addShortcutUnderParentInTree(prev, parentKey, shortcut))
-  }
-
-  const removeShortcut = (id: string) => {
-    setShortcuts((prev) => removeShortcutDeep(prev, id))
-  }
-
-  const editShortcut = (id: string, title: string, url: string, iconPatch?: string | null, iconBgColorPatch?: string | null) => {
-    setShortcuts((prev) => editShortcutInTree(prev, id, title, url, iconPatch, iconBgColorPatch))
-  }
-
-  const handleReorderSiblings = (parentKey: string, dragId: string, targetId: string) => {
-    setShortcuts((prev) => reorderSiblingsUnderParent(prev, parentKey, dragId, targetId))
-  }
-
-  const handleMergeSiblings = (parentKey: string, dragId: string, dropId: string) => {
-    setShortcuts((prev) => mergeSiblingsUnderParent(prev, parentKey, dragId, dropId))
-  }
-
-  const handleReorderRootFolders = (dragId: string, targetId: string) => {
-    setShortcuts((prev) => reorderRootFolders(prev, dragId, targetId))
-  }
-
-  const handleMoveToRoot = (folderId: string, itemId: string) => {
-    setShortcuts((prev) => moveShortcutFromFolderToRoot(prev, folderId, itemId))
-  }
-
-  const addRootFolder = (folder: Shortcut) => {
-    setShortcuts((prev) => [...prev, folder])
   }
 
   const handleBookmarkNavChange = useCallback((next: BookmarkNavState) => {
@@ -132,17 +95,15 @@ function App() {
           <ShortcutGrid
             shortcuts={shortcuts}
             gridConfig={settings.gridConfig}
-            openInNewTab={settings.openInNewTab}
             bookmarkNav={bookmarkNav}
             onBookmarkNavChange={handleBookmarkNavChange}
-            onAddShortcutUnderParent={addShortcutUnderParent}
-            onAddRootFolder={addRootFolder}
-            onRemoveShortcut={removeShortcut}
-            onEditShortcut={editShortcut}
-            onReorderSiblings={handleReorderSiblings}
-            onMergeSiblings={handleMergeSiblings}
-            onReorderRootFolders={handleReorderRootFolders}
-            onMoveToRoot={handleMoveToRoot}
+            onAddShortcutUnderParent={actions.add}
+            onAddRootFolder={actions.addRootFolder}
+            onRemoveShortcut={actions.remove}
+            onEditShortcut={actions.edit}
+            onReorderSiblings={actions.reorderSiblings}
+            onMergeSiblings={actions.mergeSiblings}
+            onReorderRootFolders={actions.reorderFolders}
           />
         </div>
       </div>

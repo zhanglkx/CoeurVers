@@ -13,7 +13,9 @@ function normalizePageUrl(input: string): string | null {
   }
 }
 
-function imageLoads(src: string, timeoutMs = 4500): Promise<boolean> {
+import { ICON_CHECK_TIMEOUT_MS } from "./app-constants"
+
+function imageLoads(src: string, timeoutMs = ICON_CHECK_TIMEOUT_MS): Promise<boolean> {
   return new Promise((resolve) => {
     const img = new Image()
     let done = false

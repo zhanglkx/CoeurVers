@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(rm -f bg.jpeg daniel-leone-v7daTKlZzaw-unsplash.jpg john-towner-3Kv48NS4WUU-unsplash.jpg tianshu-liu-aqZ3UAjs_M4-unsplash.jpg wechat.png)",
+      "Bash(rm -rf svg/)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('eslintConfig','not found'\\),indent=2\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('devDependencies',{}\\),indent=2\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('dependencies',{}\\),indent=2\\)\\); print\\('---devDeps---'\\); print\\(json.dumps\\(d.get\\('devDependencies',{}\\),indent=2\\)\\)\")"
+    ]
+  }
+}

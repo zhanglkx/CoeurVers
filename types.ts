@@ -36,5 +36,4 @@ export interface AppSettings {
   wallpaperFixedIndex: number
   blurLevel: number
   gridConfig: GridConfig
-  openInNewTab: boolean
 }
